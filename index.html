@@ -14,22 +14,33 @@
    ========================================================================== */
 
 :root {
-  --navy: #141e30;
-  --navy-soft: #243149;
-  --navy-deep: #0b1220;
-  --gold: #c8962e;
-  --gold-soft: #d9b25a;
-  --gold-deep: #a07820;
-  --cream: #f8f5f0;
-  --cream-warm: #f1ece2;
-  --cream-deep: #e8e0cf;
+  /* Primary green (matches assignment-tracker header) */
+  --navy: #1f5e3e;
+  --navy-soft: #2a7050;
+  --navy-deep: #154a30;
+
+  /* Accent (was gold, now matches tracker's emerald check marks) */
+  --gold: #16a34a;
+  --gold-soft: #22c55e;
+  --gold-deep: #15803d;
+
+  /* Cream / off-white surfaces */
+  --cream: #f7f4ec;
+  --cream-warm: #f0ebe1;
+  --cream-deep: #e8e2d4;
+
+  /* Text */
   --ink: #1a1a1a;
   --ink-soft: #4a4a4a;
-  --ink-muted: #8b8579;
-  --paper: #fdfbf6;
-  --rule: #d8cfb8;
-  --success: #4a7c3e;
-  --danger: #a84838;
+  --ink-muted: #8a8676;
+
+  /* Surfaces */
+  --paper: #ffffff;
+  --rule: #e8e4dc;
+
+  /* Status colors */
+  --success: #16a34a;
+  --danger: #dc2626;
 
   --display: 'Fraunces', 'Noto Serif SC', serif;
   --sans: 'Outfit', 'Noto Sans SC', system-ui, sans-serif;
@@ -57,8 +68,8 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse at top left, rgba(200,150,46,0.06) 0%, transparent 40%),
-    radial-gradient(ellipse at bottom right, rgba(20,30,48,0.04) 0%, transparent 50%);
+    radial-gradient(ellipse at top left, rgba(22, 163, 74, 0.04) 0%, transparent 40%),
+    radial-gradient(ellipse at bottom right, rgba(31, 94, 62, 0.03) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -73,8 +84,8 @@ body::before {
   z-index: 50;
   background: var(--navy);
   color: var(--cream);
-  border-bottom: 1px solid var(--gold);
-  box-shadow: 0 2px 20px rgba(11,18,32,0.08);
+  border-bottom: 1px solid var(--navy-deep);
+  box-shadow: 0 2px 20px rgba(11, 50, 30, 0.10);
 }
 
 .topbar-inner {
@@ -99,7 +110,7 @@ body::before {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: var(--gold);
+  background: var(--cream);
   display: grid;
   place-items: center;
   font-family: var(--display);
@@ -893,6 +904,19 @@ textarea.comment-area-en {
   padding: 28px 28px;
   position: sticky;
   top: 100px;
+  /* Cap the panel height so it sits inside the viewport
+     above the fixed action bar. */
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+@media (max-width: 1080px) {
+  /* When the layout collapses to one column, drop the sticky behaviour
+     so the panel doesn't fight with the fixed action bar. */
+  .tag-panel {
+    position: static;
+    max-height: none;
+  }
 }
 
 .tag-panel-head {
@@ -1084,17 +1108,38 @@ textarea.comment-area-en {
    ========================================================================== */
 
 .action-bar {
-  margin-top: 32px;
-  padding: 20px 28px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 16px 28px;
   background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
+  border-top: 1px solid var(--rule);
+  box-shadow: 0 -2px 12px rgba(26, 39, 68, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  grid-column: 1 / -1;
+}
+
+/* When a form is showing, leave room at the bottom so content
+   never gets hidden under the fixed action bar. */
+body.has-action-bar { padding-bottom: 96px; }
+
+@media (max-width: 720px) {
+  .action-bar {
+    padding: 12px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .action-bar-status {
+    text-align: center;
+    font-size: 12px;
+  }
+  body.has-action-bar { padding-bottom: 160px; }
 }
 
 .action-bar-status {
@@ -1110,6 +1155,13 @@ textarea.comment-area-en {
 .action-buttons {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .action-buttons { justify-content: stretch; }
+  .action-buttons .btn { flex: 1; min-width: 0; padding: 11px 8px; font-size: 12px; }
 }
 
 .btn {
@@ -1645,7 +1697,12 @@ textarea.comment-area-en {
    ========================================================================== */
 
 @media (max-width: 720px) {
-  .topbar-inner { padding: 14px 18px; }
+  .topbar-inner {
+    padding: 14px 18px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
   main { padding: 0 18px 60px; }
   .hero { padding: 40px 0 28px; margin-bottom: 36px; }
   .hero-title { font-size: 32px; }
@@ -1653,7 +1710,13 @@ textarea.comment-area-en {
   .workspace-header { padding: 28px 0 20px; }
   .workspace-title-cn { font-size: 24px; }
   .unit-control input { min-width: 0; width: 100%; }
-  .topbar-meta { display: none; }
+  /* Keep the address visible — just shrink it and let it wrap. */
+  .topbar-meta {
+    font-size: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .topbar-meta .sep { display: none; }
 }
 
 </style>
@@ -1671,7 +1734,7 @@ textarea.comment-area-en {
       </div>
     </div>
     <div class="topbar-meta">
-      <span>2585 E Bayshore Rd</span>
+      <span>4000 Middlefield Rd</span>
       <span class="sep"></span>
       <span>Palo Alto, CA 94303</span>
       <span class="sep"></span>
@@ -1762,21 +1825,21 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzr2z1ERKXAzYfyF2Ex3MQN
 const EMBEDDED_ROSTER = [
   { name: 'Aaron Monk (孟轶凡)',                chineseLevel: '二年级',  school: 'Palo Verde',   currentGrade: '2nd' },
   { name: 'Adalyn Guo(郭奇妙)',                 chineseLevel: '一年级',  school: 'Ohlone',       currentGrade: 'K'   },
-  { name: 'Adrian Zhai(翟嘉沂)',                chineseLevel: '儿歌-TK', school: 'Young 5',      currentGrade: 'TK'  },
+  { name: 'Adrian Zhai(翟嘉源)',                chineseLevel: '儿歌-TK', school: 'Young 5',      currentGrade: 'TK'  },
   { name: 'Aiden Feinleib (何依博)',            chineseLevel: '二年级',  school: 'Ohlone',       currentGrade: '2nd' },
   { name: 'Albie Leung(梁閎哲)',                chineseLevel: '儿歌-K',  school: 'Ohlone',       currentGrade: 'K'   },
   { name: 'Alexandra Wong(黄天怡)',             chineseLevel: '二年级',  school: 'Walter Hays',  currentGrade: '2nd' },
   { name: 'Allison Li (圆圆)',                  chineseLevel: '三年级',  school: 'Walter Hays',  currentGrade: '3rd' },
   { name: 'Alyssa Luo *',                       chineseLevel: '儿歌-K',  school: 'Ohlone',       currentGrade: 'K'   },
   { name: 'Andy Xu (徐安弟)',                   chineseLevel: '儿歌-TK', school: 'Palo Verde',   currentGrade: 'TK'  },
-  { name: 'Aniko Furst(晓媛)*',                 chineseLevel: '一年级',  school: 'Mount Loma',   currentGrade: '1st' },
+  { name: 'Aniko Furst(晓媛)*',                 chineseLevel: '一年级',  school: 'Mount Loma',   currentGrade: '1st', script: 'traditional' },
   { name: 'Anita Dai(黄子怡)',                  chineseLevel: '儿歌-K',  school: 'Ohlone',       currentGrade: 'K'   },
   { name: 'Aria Zhang (张睿雅)',                chineseLevel: '二年级',  school: 'Ohlone',       currentGrade: '2nd' },
   { name: 'Ashley Wong(黄天慈)',                chineseLevel: '二年级',  school: 'Walter Hays',  currentGrade: '2nd' },
   { name: 'Aspen Su',                           chineseLevel: '一年级',  school: 'Ohlone',       currentGrade: '1st' },
   { name: 'Aubree Mau (毛天俐)',                chineseLevel: '四年级',  school: 'Palo Verde',   currentGrade: '4th' },
   { name: 'Beatrice Zhang (刘一瑶)',            chineseLevel: '四年级',  school: 'Ohlone',       currentGrade: '4th' },
-  { name: 'Beckett Wang*',                      chineseLevel: '儿歌-TK', school: 'Young 5',      currentGrade: 'TK'  },
+  { name: 'Beckett Wang*',                      chineseLevel: '儿歌-TK', school: 'Young 5',      currentGrade: 'TK', script: 'traditional'  },
   { name: 'Bolin Yuan(袁伯林)',                 chineseLevel: '三年级',  school: 'Duveneck',     currentGrade: '3rd' },
   { name: 'Boya Yuan (袁博雅)',                 chineseLevel: '儿歌-K',  school: 'Duveneck',     currentGrade: 'K'   },
   { name: 'Caden Garblik (葛博勇)',             chineseLevel: '三年级',  school: 'Walter Hays',  currentGrade: '4th' },
@@ -1784,17 +1847,17 @@ const EMBEDDED_ROSTER = [
   { name: 'Calina Huang(黃麗娜)',               chineseLevel: '四年级',  school: 'Hoover',       currentGrade: '4th' },
   { name: 'Casper Chen',                        chineseLevel: '儿歌-K',  school: 'Palo Verde',   currentGrade: 'K'   },
   { name: 'Chloe Hsu (許心怡)',                 chineseLevel: '三年级',  school: 'Hoover',       currentGrade: '3rd' },
-  { name: 'Christy Chan*(陳紫瑩)',              chineseLevel: '一年级',  school: 'Addison',      currentGrade: 'K'   },
+  { name: 'Christy Chan*(陳紫瑩)',              chineseLevel: '一年级',  school: 'Addison',      currentGrade: 'K', script: 'traditional'   },
   { name: 'Colin Wang(西西)',                   chineseLevel: '三年级',  school: 'Palo Verde',   currentGrade: '3rd' },
   { name: 'Damon Shao (邵瑞哲)',                chineseLevel: '二年级',  school: 'El Carmelo',   currentGrade: '3rd' },
-  { name: 'Daniel Ni(倪梁邁)',                  chineseLevel: '五年级',  school: 'El Carmelo',   currentGrade: '5th' },
+  { name: 'Daniel Ni(倪梁遒)',                  chineseLevel: '五年级',  school: 'El Carmelo',   currentGrade: '5th' },
   { name: 'Daniel Xu(豆豆)',                    chineseLevel: '二年级',  school: 'El Carmelo',   currentGrade: '2nd' },
   { name: 'Decker Garblik(葛博宇)',             chineseLevel: '二年级',  school: 'Walter Hays',  currentGrade: '2nd' },
   { name: 'Elena Lin (林依彤)',                 chineseLevel: '二年级',  school: 'El Carmelo',   currentGrade: '2nd' },
   { name: 'Eric He (贺鑫睿)',                   chineseLevel: '一年级',  school: 'Ohlone',       currentGrade: '1st' },
   { name: 'Esmee Teh (郑婷妤)',                 chineseLevel: '四年级',  school: 'Palo Verde',   currentGrade: '4th' },
   { name: 'Ethan Hebert (卢昱博)',              chineseLevel: '四年级',  school: 'Ohlone',       currentGrade: '4th' },
-  { name: 'Ethan Lam(林祖安) *',                chineseLevel: '四年级',  school: 'Ohlone',       currentGrade: '4th' },
+  { name: 'Ethan Lam(林祖安) *',                chineseLevel: '四年级',  school: 'Ohlone',       currentGrade: '4th', script: 'traditional' },
   { name: 'Eva Macnish(姜悅馨)',                chineseLevel: '三年级',  school: 'Addison',      currentGrade: '4th' },
   { name: 'Everett Wilcher (魏佰龙)',           chineseLevel: '二年级',  school: 'Escondido',    currentGrade: '2nd' },
   { name: 'Everly Garblik (葛博雅)',            chineseLevel: '儿歌-K',  school: 'Walter Hays',  currentGrade: 'K'   },
@@ -1808,7 +1871,7 @@ const EMBEDDED_ROSTER = [
   { name: 'Jude Byun (边乐)',                   chineseLevel: '五年级',  school: 'Palo Verde',   currentGrade: '5th' },
   { name: 'Kevin Yu(于博衍)',                   chineseLevel: '二年级',  school: 'Duveneck',     currentGrade: '2nd' },
   { name: 'Krystal Zhang (张可冰)',             chineseLevel: '二年级',  school: 'Duveneck',     currentGrade: '3rd' },
-  { name: 'Leonard Chou(周禹希)*',              chineseLevel: '一年级',  school: 'Palo Verde',   currentGrade: '1st' },
+  { name: 'Leonard Chou(周禹希)*',              chineseLevel: '一年级',  school: 'Palo Verde',   currentGrade: '1st', script: 'traditional' },
   { name: 'Louis Gonzalo Aniano Cao(曹麓祎)',   chineseLevel: '儿歌-TK', school: 'Duveneck',     currentGrade: 'TK'  },
   { name: 'Lucas Chen (陈希)',                  chineseLevel: '四年级',  school: 'Hoover',       currentGrade: '4th' },
   { name: 'Lucas Zou(邹明乐)',                  chineseLevel: '四年级',  school: 'Hoover',       currentGrade: '4th' },
@@ -1832,7 +1895,7 @@ const EMBEDDED_ROSTER = [
   { name: 'Sophia Wang(王思语)',                chineseLevel: '二年级',  school: 'Nixon',        currentGrade: '2nd' },
   { name: 'Stella Cheung',                      chineseLevel: '一年级',  school: 'Nixon',        currentGrade: 'K'   },
   { name: 'Stella Luo',                         chineseLevel: '儿歌-K',  school: 'Duveneck',     currentGrade: 'K'   },
-  { name: 'Tessa Wu(吴思敏)*',                  chineseLevel: '三年级',  school: 'Hoover',       currentGrade: '4th' },
+  { name: 'Tessa Wu(吴思敏)*',                  chineseLevel: '三年级',  school: 'Hoover',       currentGrade: '4th', script: 'traditional' },
   { name: 'Theodore Zhang(刘昊谦)',             chineseLevel: '儿歌-K',  school: 'Ohlone',       currentGrade: 'K'   },
   { name: 'Ting Yang(杨婷)',                    chineseLevel: '一年级',  school: 'Challenger',   currentGrade: 'K'   },
   { name: 'Victoria Schmitlin(斯维利)',         chineseLevel: '二年级',  school: 'Palo Verde',   currentGrade: '5th' },
@@ -2463,6 +2526,7 @@ async function apiPost(action, payload) {
    ========================================================================== */
 
 function renderHome() {
+  document.body.classList.remove('has-action-bar');
   const grid = document.getElementById('teacherGrid');
   // Initial render — placeholder count, will populate after prefetch
   grid.innerHTML = TEACHERS.map((t, i) => `
@@ -2835,6 +2899,7 @@ function renderForm() {
   const shell = document.getElementById('formShell');
 
   if (!state.selectedStudent && !state.teacher.online) {
+    document.body.classList.remove('has-action-bar');
     shell.innerHTML = `<div class="form-main" style="grid-column: 1/-1;">
       <div class="empty-state">
         <div class="empty-state-title">Pick a student to begin</div>
@@ -2843,6 +2908,9 @@ function renderForm() {
     </div>`;
     return;
   }
+
+  // Action bar is fixed at bottom — make room for it via body padding
+  document.body.classList.add('has-action-bar');
 
   // online teacher: only render tag panel for now
   if (state.teacher.online) {
@@ -3323,7 +3391,7 @@ function generateComment() {
         : `${cnName}${unitPhrase}${connector}${first}。`);
     } else if (voice === '3p_tongxue') {
       // 晓娟老师 K/TK voice: prefers English nickname even in Chinese (Beckett同学,
-      // Adrian同学 — not 翟嘉沂). Drop "同学" suffix when the name is already
+      // Adrian同学 — not 翟嘉源). Drop "同学" suffix when the name is already
       // Chinese (e.g. 锦轩) for a more natural feel.
       const displayName = enName || cnName;
       const hasCnChars = /[\u4e00-\u9fff]/.test(displayName);
@@ -3646,10 +3714,10 @@ function buildReportHtml() {
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Noto+Sans+SC:wght@300;400;500;600&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --navy: #141e30; --gold: #c8962e; --gold-deep: #a07820;
-  --cream: #f8f5f0; --cream-warm: #f1ece2; --paper: #fdfbf6;
-  --ink: #1a1a1a; --ink-soft: #4a4a4a; --ink-muted: #8b8579;
-  --rule: #d8cfb8;
+  --navy: #1f5e3e; --gold: #16a34a; --gold-deep: #15803d;
+  --cream: #f7f4ec; --cream-warm: #f0ebe1; --paper: #ffffff;
+  --ink: #1a1a1a; --ink-soft: #4a4a4a; --ink-muted: #8a8676;
+  --rule: #e8e4dc;
   --display: 'Fraunces', 'Noto Serif SC', serif;
   --sans: 'Outfit', 'Noto Sans SC', system-ui, sans-serif;
   --cn: 'Noto Sans SC', 'PingFang SC', sans-serif;
@@ -3804,7 +3872,7 @@ table.t td { font-family: var(--cn); color: var(--ink); font-weight: 500; }
         </div>
       </div>
       <div class="address">
-        2585 E Bayshore Rd<br>
+        4000 Middlefield Rd<br>
         Palo Alto, CA 94303<br>
         (650) 494-7389
       </div>
