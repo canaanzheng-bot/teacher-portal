@@ -669,6 +669,16 @@ main {
 
 .chip.active.done .check { color: white; }
 
+/* Student has a cloud draft (started but not yet saved as a report) */
+.chip.drafted {
+  border-color: rgba(201, 162, 39, 0.55);
+  background: rgba(201, 162, 39, 0.10);
+}
+.chip.drafted .draft-mark { color: #b8860b; font-size: 12px; }
+.chip.active.drafted .draft-mark { color: white; }
+.action-bar-status.cloud { color: var(--success); }
+.action-bar-status.error { color: var(--danger); }
+
 /* Traditional-Chinese learner indicator on student chips */
 .trad-badge {
   display: inline-block;
@@ -2475,6 +2485,7 @@ let state = {
   tags: {},                // { Strengths: [{tagID, tagCn, tagEn}], Improvements: [...], Encouragement: [...] }
   selectedTags: { Strengths: new Set(), Improvements: new Set(), Encouragement: new Set() },
   completedStudents: new Set(),  // names of students with reports submitted for current unit
+  draftStudents: new Set(),      // names of students with a cloud draft for current unit
   selectedStudent: null,   // student record currently being edited
   form: {},                // current form data
   editMode: false,
@@ -2940,11 +2951,13 @@ async function enterWorkspace(teacherId) {
       ? Promise.resolve({ __cached: true, data: state.studentsCache })
       : prefetchStudents().then(() => ({ __cached: true, data: state.studentsCache }));
 
-    const [studentsResp, tagsResp, completedResp] = await Promise.all([
+    const [studentsResp, tagsResp, completedResp, draftsResp] = await Promise.all([
       studentsPromise,
       apiGet('tpGetTags', { teacher: teacher.nameCn }).catch(e => { dlog('tpGetTags ERROR', e.message); return null; }),
-      apiGet('tpGetReportStatus', { teacher: teacher.nameCn, unit: state.unit }).catch(() => null)
+      apiGet('tpGetReportStatus', { teacher: teacher.nameCn, unit: state.unit }).catch(() => null),
+      apiGet('tpListDrafts', { teacher: teacher.nameCn, unit: state.unit }).catch(() => null)
     ]);
+    state.draftStudents = new Set(extractList(draftsResp, 'students', 'data'));
 
     dlog('tpGetStudents response (cached=' + !!(studentsResp && studentsResp.__cached) + ')', studentsResp);
     dlog('tpGetTags response', tagsResp);
@@ -3098,10 +3111,11 @@ function renderStudentStrip() {
 
   const renderChip = (s) => {
     const done = state.completedStudents.has(s['Student Name']);
+    const hasDraft = !done && state.draftStudents.has(s['Student Name']);
     const active = state.selectedStudent && state.selectedStudent['Student Name'] === s['Student Name'];
     const isTrad = s.script === 'traditional';
-    return `<div class="chip ${done ? 'done' : ''} ${active ? 'active' : ''} ${isTrad ? 'trad' : ''}" data-student="${escapeHtml(s['Student Name'])}">
-      ${done ? '<span class="check">✓</span>' : ''}${escapeHtml(s['Student Name'])}${isTrad ? '<span class="trad-badge" title="Traditional Chinese learner · 繁體中文学习者">繁</span>' : ''}
+    return `<div class="chip ${done ? 'done' : ''} ${hasDraft ? 'drafted' : ''} ${active ? 'active' : ''} ${isTrad ? 'trad' : ''}" data-student="${escapeHtml(s['Student Name'])}">
+      ${done ? '<span class="check">✓</span>' : (hasDraft ? '<span class="draft-mark" title="有未完成的草稿 · Draft saved">✎</span>' : '')}${escapeHtml(s['Student Name'])}${isTrad ? '<span class="trad-badge" title="Traditional Chinese learner · 繁體中文学习者">繁</span>' : ''}
     </div>`;
   };
 
@@ -3411,9 +3425,10 @@ function renderForm() {
 
     <!-- Action bar -->
     <div class="action-bar">
-      <div class="action-bar-status" id="saveStatus">Auto-saving drafts to this browser · 草稿保存在本机</div>
+      <div class="action-bar-status" id="saveStatus">草稿会自动保存到云端 · Drafts auto-save to the cloud</div>
       <div class="action-buttons">
         <button class="btn btn-ghost" onclick="clearDraft()">清空草稿</button>
+        <button class="btn btn-ghost" id="saveDraftBtn" onclick="saveDraftNow()" title="先存着，考试成绩出来再回来填">保存草稿 · Save Draft</button>
         <button class="btn btn-secondary" onclick="previewReport()">Preview · 预览</button>
         <button class="btn btn-gold" id="saveBtn" onclick="saveAndPrint()">Save &amp; Print · 保存并打印</button>
       </div>
@@ -3633,13 +3648,15 @@ function onFormChange() {
   }, 500);
 }
 
-function setSaveStatus(s) {
+function setSaveStatus(s, extra) {
   const el = document.getElementById('saveStatus');
   if (!el) return;
-  el.classList.remove('saving','saved');
-  if (s === 'saving') { el.classList.add('saving'); el.textContent = 'Saving draft… · 正在保存草稿'; }
-  else if (s === 'saved') { el.classList.add('saved'); el.textContent = '✓ Draft saved locally · 草稿已保存到本机'; }
-  else el.textContent = 'Auto-saving drafts to this browser · 草稿保存在本机';
+  el.classList.remove('saving','saved','cloud','error');
+  if (s === 'saving')      { el.classList.add('saving'); el.textContent = '正在保存草稿… · Saving draft'; }
+  else if (s === 'saved')  { el.classList.add('saved');  el.textContent = '✓ 已保存到本机，正在同步云端… · Saved locally, syncing'; }
+  else if (s === 'cloud')  { el.classList.add('cloud');  el.textContent = '✓ 草稿已保存到云端 · Draft saved to the cloud' + (extra ? ' · ' + extra : ''); }
+  else if (s === 'error')  { el.classList.add('error');  el.textContent = '⚠ 云端保存失败（本机已保存）· Cloud save failed' + (extra ? ' · ' + extra : ''); }
+  else el.textContent = '草稿会自动保存到云端 · Drafts auto-save to the cloud';
 }
 
 function draftKey() {
@@ -3660,35 +3677,143 @@ function saveDraft() {
     savedAt: new Date().toISOString()
   };
   try { localStorage.setItem(k, JSON.stringify(payload)); } catch (e) { console.warn(e); }
+  scheduleCloudSave();
+}
+
+/* ── Cloud drafts (ReportDrafts tab via Apps Script) ─────────────────────
+   Local storage keeps things instant; the cloud copy is what lets a
+   teacher start a report today and finish it (exam scores etc.) later,
+   from any computer. Newest copy wins when both exist. */
+let cloudSaveTimer = null;
+let cloudSaveInflight = null;
+
+function draftIdentity() {
+  if (!state.teacher || !state.selectedStudent) return null;
+  return { teacher: state.teacher.nameCn, unit: state.unit, studentName: state.selectedStudent['Student Name'] };
+}
+
+function draftIsEmpty(payload) {
+  const f = payload.form || {};
+  const hasText = Object.keys(f).some(id => id !== 'f_date' && String(f[id] || '').trim() !== '');
+  const t = payload.selectedTags || {};
+  const hasTags = ['Strengths','Improvements','Encouragement'].some(c => (t[c] || []).length > 0);
+  return !hasText && !hasTags;
+}
+
+function scheduleCloudSave() {
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => cloudSaveDraft(false), 2500);
+}
+
+async function cloudSaveDraft(explicit) {
+  const id = draftIdentity();
+  const k = draftKey();
+  if (!id || !k) return;
+  let payload;
+  try { payload = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { payload = null; }
+  if (!payload) return;
+  if (draftIsEmpty(payload) && !explicit) return;   // nothing worth syncing yet
+  const studentName = id.studentName;
+  try {
+    cloudSaveInflight = apiPost('tpSaveDraft', Object.assign({}, id, { draft: JSON.stringify(payload), updatedAt: payload.savedAt }));
+    const r = await cloudSaveInflight;
+    if (!r || !(r.ok || r.success)) throw new Error((r && r.error) || 'unknown');
+    if (!state.selectedStudent || state.selectedStudent['Student Name'] !== studentName) return;
+    if (!state.completedStudents.has(studentName) && !state.draftStudents.has(studentName)) {
+      state.draftStudents.add(studentName);
+      renderStudentStrip();
+    }
+    setSaveStatus('cloud', new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
+    if (explicit) toast('Draft saved', `${studentName} 的草稿已保存到云端，下次打开会自动恢复`, 'success');
+  } catch (e) {
+    dlog('tpSaveDraft ERROR', e.message);
+    if (!state.selectedStudent || state.selectedStudent['Student Name'] !== studentName) return;
+    const notDeployed = /unknown.*action/i.test(e.message || '');
+    setSaveStatus('error', notDeployed ? '后台需要重新部署 tpSaveDraft' : e.message);
+    if (explicit) toast('Cloud save failed', '草稿只保存在本机：' + e.message, 'error');
+  } finally {
+    cloudSaveInflight = null;
+  }
+}
+
+function saveDraftNow() {
+  if (!state.selectedStudent) { toast('Pick a student', '请先选择一位学生', 'error'); return; }
+  if (saveTimer) clearTimeout(saveTimer);
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  saveDraft();          // local first (also schedules a cloud save, which we cancel below)
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  setSaveStatus('saving');
+  cloudSaveDraft(true);
+}
+
+function applyDraftPayload(data) {
+  writeForm(data.form || {});
+  if (data.selectedTags) {
+    state.selectedTags = {
+      Strengths: new Set(data.selectedTags.Strengths || []),
+      Improvements: new Set(data.selectedTags.Improvements || []),
+      Encouragement: new Set(data.selectedTags.Encouragement || [])
+    };
+    TAG_CATEGORIES.forEach(cat => {
+      const el = document.getElementById('tagList_' + cat.key);
+      if (el) el.innerHTML = renderTagList(cat.key);
+    });
+  }
 }
 
 function loadDraft() {
   const k = draftKey();
   if (!k) return;
+  let local = null;
   try {
     const raw = localStorage.getItem(k);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    writeForm(data.form || {});
-    if (data.selectedTags) {
-      state.selectedTags = {
-        Strengths: new Set(data.selectedTags.Strengths || []),
-        Improvements: new Set(data.selectedTags.Improvements || []),
-        Encouragement: new Set(data.selectedTags.Encouragement || [])
-      };
-      TAG_CATEGORIES.forEach(cat => {
-        const el = document.getElementById('tagList_' + cat.key);
-        if (el) el.innerHTML = renderTagList(cat.key);
-      });
-    }
-    setSaveStatus('saved');
+    if (raw) local = JSON.parse(raw);
   } catch (e) { console.warn(e); }
+  if (local) {
+    applyDraftPayload(local);
+    setSaveStatus('saved');
+  }
+  // Then check the cloud; the newer copy wins.
+  loadCloudDraft(k, local);
+}
+
+async function loadCloudDraft(k, local) {
+  const id = draftIdentity();
+  if (!id) return;
+  const studentName = id.studentName;
+  try {
+    const r = await apiGet('tpGetDraft', id);
+    if (!state.selectedStudent || state.selectedStudent['Student Name'] !== studentName || draftKey() !== k) return;
+    const cloud = r && r.draft;
+    if (!cloud) {
+      if (local) setSaveStatus(draftIsEmpty(local) ? 'idle' : 'saved');   // local-only draft; it will sync on next change
+      return;
+    }
+    const cloudAt = Date.parse(cloud.savedAt || r.updatedAt || 0) || 0;
+    const localAt = local ? (Date.parse(local.savedAt || 0) || 0) : 0;
+    if (!local || cloudAt > localAt) {
+      applyDraftPayload(cloud);
+      try { localStorage.setItem(k, JSON.stringify(cloud)); } catch (e) {}
+      toast('Draft restored', '已从云端恢复上次保存的草稿', 'success');
+    }
+    setSaveStatus('cloud', formatTrackerDate(cloud.savedAt || r.updatedAt));
+  } catch (e) {
+    dlog('tpGetDraft ERROR', e.message);
+    if (!state.selectedStudent || state.selectedStudent['Student Name'] !== studentName) return;
+    if (local && !draftIsEmpty(local)) setSaveStatus('saved');
+  }
 }
 
 function clearDraft() {
-  if (!confirm('清空当前学生的所有草稿？')) return;
+  if (!confirm('清空当前学生的所有草稿（包括云端）？')) return;
   const k = draftKey();
   if (k) localStorage.removeItem(k);
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  const id = draftIdentity();
+  if (id) {
+    apiPost('tpDeleteDraft', id).catch(e => dlog('tpDeleteDraft ERROR', e.message));
+    if (state.draftStudents.delete(id.studentName)) renderStudentStrip();
+  }
   // reset form
   formInputIds().forEach(id => {
     const el = document.getElementById(id);
@@ -4501,8 +4626,12 @@ document.getElementById('unitInput').addEventListener('change', async (e) => {
   // refresh completed list for new unit
   if (state.teacher && !state.teacher.online) {
     try {
-      const r = await apiGet('tpGetReportStatus', { teacher: state.teacher.nameCn, unit: state.unit });
+      const [r, d] = await Promise.all([
+        apiGet('tpGetReportStatus', { teacher: state.teacher.nameCn, unit: state.unit }),
+        apiGet('tpListDrafts', { teacher: state.teacher.nameCn, unit: state.unit }).catch(() => null)
+      ]);
       state.completedStudents = new Set(r.completed || r || []);
+      state.draftStudents = new Set(extractList(d, 'students', 'data'));
       renderStudentStrip();
     } catch (err) { console.warn(err); }
   }
